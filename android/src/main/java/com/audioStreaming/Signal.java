@@ -242,7 +242,7 @@ public class Signal extends Service implements ExoPlayer.EventListener, Metadata
     public void pause() {
         Assertions.assertNotNull(player);
         player.setPlayWhenReady(false);
-        sendBroadcast(new Intent(Mode.STOPPED));
+        sendBroadcast(new Intent(Mode.PAUSED));
     }
     
     public void resume() {
