@@ -216,13 +216,13 @@ RCT_EXPORT_METHOD(getStatus: (RCTResponseSenderBlock) callback)
 
 - (void)audioPlayer:(STKAudioPlayer *)audioPlayer didReadStreamMetadata:(NSDictionary *)dictionary {
    NSLog(@"AudioPlayer SONG NAME  %@", dictionary[@"StreamTitle"]);
-    
-   self.currentSong = dictionary[@"StreamTitle"];
+   
+   self.currentSong = dictionary[@"StreamTitle"] ? dictionary[@"StreamTitle"] : @"";
    [self.bridge.eventDispatcher sendDeviceEventWithName:@"AudioBridgeEvent" body:@{
-                                                                                 @"status": @"METADATA_UPDATED",
-                                                                                 @"key": @"StreamTitle",
-                                                                                 @"value": dictionary[@"StreamTitle"]
-                                                                                 }];
+                                                                                   @"status": @"METADATA_UPDATED",
+                                                                                   @"key": @"StreamTitle",
+                                                                                   @"value": self.currentSong
+                                                                                   }];
    [self setNowPlayingInfo:true];
 }
 
@@ -479,8 +479,6 @@ RCT_EXPORT_METHOD(getStatus: (RCTResponseSenderBlock) callback)
                                        [NSNumber numberWithDouble: self.audioPlayer.duration], MPMediaItemPropertyPlaybackDuration,
                                        [NSNumber numberWithFloat:isPlaying ? 1.0f : 0.0], MPNowPlayingInfoPropertyPlaybackRate, nil];
       [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nowPlayingInfo;
-   } else {
-      [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nil;
    }
 }
 

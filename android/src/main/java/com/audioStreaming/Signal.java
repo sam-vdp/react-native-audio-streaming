@@ -396,6 +396,140 @@ public class Signal extends Service implements ExoPlayer.EventListener, Metadata
         return this.streamingURL;
     }
 
+    public boolean isConnected() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = cm.getActiveNetworkInfo();
+        if (netInfo != null && netInfo.isConnectedOrConnecting()) {
+            return true;
+        }
+        return false;
+    }
+
+    public void prepare() {
+        /* ------Station- buffering-------- */
+        this.isPreparingStarted = true;
+        sendBroadcast(new Intent(Mode.START_PREPARING));
+
+        try {
+            this.aacPlayer.playAsync(this.streamingURL);
+        } catch (Exception e) {
+            e.printStackTrace();
+            stop();
+        }
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return binder;
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (this.isPlaying) {
+            sendBroadcast(new Intent(Mode.PLAYING));
+        } else if (this.isPreparingStarted) {
+            sendBroadcast(new Intent(Mode.START_PREPARING));
+        } else {
+            sendBroadcast(new Intent(Mode.STARTED));
+        }
+
+        return Service.START_NOT_STICKY;
+    }
+
+    @Override
+    public void onPrepared(MediaPlayer _mediaPlayer) {
+        this.isPreparingStarted = false;
+        sendBroadcast(new Intent(Mode.PREPARED));
+    }
+
+    @Override
+    public void onCompletion(MediaPlayer mediaPlayer) {
+        this.isPlaying = false;
+        this.aacPlayer.stop();
+        sendBroadcast(new Intent(Mode.COMPLETED));
+    }
+
+    @Override
+    public boolean onInfo(MediaPlayer mp, int what, int extra) {
+        if (what == 701) {
+            this.isPlaying = false;
+            sendBroadcast(new Intent(Mode.BUFFERING_START));
+        } else if (what == 702) {
+            this.isPlaying = true;
+            sendBroadcast(new Intent(Mode.BUFFERING_END));
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onError(MediaPlayer mp, int what, int extra) {
+        switch (what) {
+            case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
+                //Log.v("ERROR", "MEDIA ERROR NOT VALID FOR PROGRESSIVE PLAYBACK "	+ extra);
+                break;
+            case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
+                //Log.v("ERROR", "MEDIA ERROR SERVER DIED " + extra);
+                break;
+            case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                //Log.v("ERROR", "MEDIA ERROR UNKNOWN " + extra);
+                break;
+        }
+        sendBroadcast(new Intent(Mode.ERROR));
+        return false;
+    }
+
+    @Override
+    public void playerStarted() {
+        //  TODO
+    }
+
+    @Override
+    public void playerPCMFeedBuffer(boolean isPlaying, int bufSizeMs, int bufCapacityMs) {
+        if (isPlaying) {
+            this.isPreparingStarted = false;
+            if (bufSizeMs < 500) {
+                this.isPlaying = false;
+                sendBroadcast(new Intent(Mode.BUFFERING_START));
+                //buffering
+            } else {
+                this.isPlaying = true;
+                sendBroadcast(new Intent(Mode.PLAYING));
+                //playing
+            }
+        } else {
+            //buffering
+            this.isPlaying = false;
+            sendBroadcast(new Intent(Mode.BUFFERING_START));
+        }
+    }
+
+    @Override
+    public void playerException(final Throwable t) {
+        this.isPlaying = false;
+        this.isPreparingStarted = false;
+        sendBroadcast(new Intent(Mode.ERROR));
+        //  TODO
+    }
+
+    @Override
+    public void playerMetadata(final String key, final String value) {
+        Intent metaIntent = new Intent(Mode.METADATA_UPDATED);
+        metaIntent.putExtra("key", key);
+        metaIntent.putExtra("value", value);
+        sendBroadcast(metaIntent);
+
+        if (key != null && key.equals("StreamTitle") && remoteViews != null && value != null) {
+            remoteViews.setTextViewText(R.id.song_name_notification, value);
+            notifyBuilder.setContent(remoteViews);
+            notifyManager.notify(NOTIFY_ME_ID, notifyBuilder.build());
+        }
+    }
+
+    @Override
+    public void playerAudioTrackCreated(AudioTrack atrack) {
+        //  TODO
+    }
+
     @Override
     public void onLoadError(IOException error) {
         Log.e(TAG, error.getMessage());
